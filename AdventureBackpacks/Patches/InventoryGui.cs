@@ -200,7 +200,11 @@ internal static class InventoryGuiPatches
         }
     }
     
-    public static bool TryOpenAlongsideContainer(Player player, InventoryGui instance)
+    /// <summary>
+    /// When Open Alongside Container is on, always use the right-side backpack panel
+    /// (with or without a world chest). Returns false if the feature is disabled.
+    /// </summary>
+    public static bool TryOpenSidePanel(Player player, InventoryGui instance)
     {
         if (player == null || instance == null)
             return false;
@@ -208,7 +212,8 @@ internal static class InventoryGuiPatches
         if (!ConfigRegistry.OpenAlongsideContainer.Value)
             return false;
 
-        if (instance.m_currentContainer == null || instance.m_currentContainer.IsBackpackProxy())
+        // Already showing as the vanilla container slot — leave that path alone.
+        if (instance.m_currentContainer != null && instance.m_currentContainer.IsBackpackProxy())
             return false;
 
         return SecondaryBackpackPanel.Show(instance, player);
@@ -228,7 +233,7 @@ internal static class InventoryGuiPatches
         {
             _showBackpack = false;
 
-            if (TryOpenAlongsideContainer(player, instance))
+            if (TryOpenSidePanel(player, instance))
                 return;
 
             if (!BackpackIsOpen && instance.m_currentContainer != null)
@@ -329,7 +334,7 @@ internal static class InventoryGuiPatches
 
         if (openBackpack & !CheckForTextInput())
         {
-            if (TryOpenAlongsideContainer(player, instance))
+            if (TryOpenSidePanel(player, instance))
                 return false;
 
             if (instance.m_currentContainer != null)
@@ -824,41 +829,6 @@ internal static class InventoryGuiPatches
         }
     }
 
-    [HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.CloseContainer))]
-    static class InventoryGuiCloseContainerPatch
-    {
-        [HarmonyPrepare]
-        private static bool Prepare() => !PlayerExtensions.IsDedicatedOrHeadless();
-
-        [HarmonyPrefix]
-        static void Prefix(InventoryGui __instance, out bool __state)
-        {
-            // Closing a world chest while the secondary backpack panel is open:
-            // promote the backpack into the normal container slot afterwards.
-            __state = SecondaryBackpackPanel.IsOpen &&
-                      __instance != null &&
-                      __instance.m_currentContainer != null &&
-                      !__instance.m_currentContainer.IsBackpackProxy();
-        }
-
-        [HarmonyPostfix]
-        static void Postfix(InventoryGui __instance, bool __state)
-        {
-            if (!__state || __instance == null || Player.m_localPlayer == null)
-                return;
-
-            SecondaryBackpackPanel.Hide();
-            if (Player.m_localPlayer.CanOpenBackpack())
-            {
-                Player.m_localPlayer.OpenBackpack(__instance);
-            }
-            else
-            {
-                BackpackIsOpen = false;
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.UpdateContainer))]
     static class InventoryGuiUpdateContainerPatch
     {
@@ -868,26 +838,10 @@ internal static class InventoryGuiPatches
         [HarmonyPostfix]
         static void Postfix(InventoryGui __instance, Player player)
         {
-            if (!SecondaryBackpackPanel.IsOpen)
-                return;
-
-            if (player == null || __instance == null || __instance.m_currentContainer == null)
-            {
-                // World container went away; promote or clear.
-                if (SecondaryBackpackPanel.IsOpen && player != null && player.CanOpenBackpack())
-                {
-                    SecondaryBackpackPanel.Hide();
-                    player.OpenBackpack(__instance);
-                }
-                else
-                {
-                    SecondaryBackpackPanel.Hide();
-                    BackpackIsOpen = false;
-                }
-                return;
-            }
-
-            SecondaryBackpackPanel.Refresh(player);
+            // Keep the side panel alive whether or not a world chest is open.
+            // Do not fall back to InventoryGui.Show (below-inventory slot).
+            if (SecondaryBackpackPanel.IsOpen && player != null)
+                SecondaryBackpackPanel.Refresh(player);
         }
     }
 

@@ -58,7 +58,7 @@ namespace AdventureBackpacks.Configuration
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref OpenWithHoverInteract);
 
             UnsyncedConfig("Local Config", "Open Alongside Container", false,
-                new ConfigDescription("If enabled, opening the backpack while a chest or other container is open keeps that container open and shows the backpack beside it.",
+                new ConfigDescription("If enabled, the backpack always opens in a side panel to the right of the player inventory (same window empty or filled). World chests stay open so you can move items between chest and backpack.",
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref OpenAlongsideContainer);
 
             UnsyncedConfig("Local Config", "Alongside Panel Gap", 72f,

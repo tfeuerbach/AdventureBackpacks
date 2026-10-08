@@ -8,13 +8,19 @@ using UnityEngine.UI;
 namespace AdventureBackpacks.Features;
 
 /// <summary>
-/// Shows the equipped backpack inventory as a cloned container panel while a
-/// world container (chest, etc.) remains InventoryGui.m_currentContainer.
+/// Dedicated backpack panel cloned from InventoryGui.m_container, always placed
+/// to the right of the player inventory. Used whenever Open Alongside Container
+/// is enabled so empty/filled and chest/no-chest all share one window.
 /// </summary>
 internal static class SecondaryBackpackPanel
 {
     private const string PanelName = "AB_BackpackSecondary";
     private const string GridName = "AB_BackpackGrid";
+
+    // Stable chrome padding — do not derive from the live chest panel (that changes size).
+    private const float PadX = 70f;
+    private const float PadY = 110f;
+    private const float DefaultCell = 64f;
 
     private static GameObject _panel;
     private static InventoryGrid _grid;
@@ -61,11 +67,10 @@ internal static class SecondaryBackpackPanel
             return false;
 
         if (_name != null)
-            _name.text = Localization.instance.Localize(backpackContainer.GetInventory()?.GetName() ?? "$item_backpack");
+            _name.text = Localization.instance.Localize(inv.GetName() ?? "$item_backpack");
 
         _panel.SetActive(true);
 
-        // Size chrome first, then bind inventory like a vanilla container (player=null).
         Layout(gui);
         if (!BindGrid(gui.m_dragItem, forceRebuild: true))
         {
@@ -115,7 +120,6 @@ internal static class SecondaryBackpackPanel
 
         try
         {
-            // Soft refresh — same as InventoryGui.UpdateContainer (no hotbar bindings).
             BindGrid(_gui.m_dragItem, forceRebuild: false);
             Layout(_gui);
         }
@@ -128,7 +132,10 @@ internal static class SecondaryBackpackPanel
     private static void EnsurePanel(InventoryGui gui)
     {
         if (_panel != null)
+        {
+            WireGridCallbacks(gui);
             return;
+        }
 
         var parent = gui.m_container.parent != null ? gui.m_container.parent : gui.m_inventoryRoot;
         _panel = Object.Instantiate(gui.m_container.gameObject, parent);
@@ -138,13 +145,12 @@ internal static class SecondaryBackpackPanel
         if (_grid != null)
         {
             _grid.name = GridName;
-            // Drop any slots cloned from the open chest before first bind.
             ClearGridRoot(_grid);
+            WireGridCallbacks(gui);
         }
 
         _name = null;
 
-        // Prefer the same name label the container panel uses when present.
         foreach (var tmp in _panel.GetComponentsInChildren<TMP_Text>(true))
         {
             if (gui.m_containerName != null && tmp.name == gui.m_containerName.name)
@@ -157,7 +163,7 @@ internal static class SecondaryBackpackPanel
         if (_name == null)
             _name = _panel.GetComponentInChildren<TMP_Text>(true);
 
-        // Take All / Stack All on the clone would hit the chest (m_currentContainer). Hide them.
+        // Take All / Stack All would target m_currentContainer (the chest). Hide them.
         foreach (var button in _panel.GetComponentsInChildren<Button>(true))
         {
             var n = button.gameObject.name;
@@ -170,10 +176,24 @@ internal static class SecondaryBackpackPanel
         }
     }
 
-    /// <summary>
-    /// Bind backpack inventory the same way vanilla binds a chest:
-    /// UpdateInventory(inv, player: null, drag) so hotbar binding numbers stay off.
-    /// </summary>
+    private static void WireGridCallbacks(InventoryGui gui)
+    {
+        if (_grid == null || gui?.m_containerGrid == null)
+            return;
+
+        var src = gui.m_containerGrid;
+        _grid.m_onSelected = src.m_onSelected;
+        _grid.m_onRightClick = src.m_onRightClick;
+        _grid.m_onReleased = src.m_onReleased;
+        _grid.OnMoveToUpperInventoryGrid = src.OnMoveToUpperInventoryGrid;
+        _grid.OnMoveToLowerInventoryGrid = src.OnMoveToLowerInventoryGrid;
+        _grid.OnSetTouchSelection = src.OnSetTouchSelection;
+        _grid.CanDropDragOntoItem = src.CanDropDragOntoItem;
+
+        if (_grid.m_uiGroup != null)
+            _grid.m_uiGroup.gameObject.SetActive(true);
+    }
+
     private static bool BindGrid(ItemDrop.ItemData dragItem, bool forceRebuild)
     {
         var inv = GetInventory();
@@ -185,12 +205,11 @@ internal static class SecondaryBackpackPanel
             if (forceRebuild)
             {
                 ClearGridRoot(_grid);
-                // Force UpdateGui's rebuild path when dimensions already match a prior bind.
                 _grid.m_width = 0;
                 _grid.m_height = 0;
             }
 
-            // Vanilla InventoryGui.UpdateContainer passes null for Player — that hides "1"-"8" bindings.
+            // Vanilla chests pass null Player so hotbar binding numbers stay off.
             _grid.UpdateInventory(inv, null, dragItem);
 
             if (forceRebuild)
@@ -221,7 +240,6 @@ internal static class SecondaryBackpackPanel
             grid.m_elements.Clear();
         }
 
-        // Orphaned visuals under the grid root (not tracked in m_elements).
         if (grid.m_gridRoot != null)
         {
             for (var i = grid.m_gridRoot.childCount - 1; i >= 0; i--)
@@ -238,7 +256,7 @@ internal static class SecondaryBackpackPanel
 
     private static void Layout(InventoryGui gui)
     {
-        if (_panel == null || gui.m_player == null || gui.m_container == null)
+        if (_panel == null || gui.m_player == null)
             return;
 
         var rt = _panel.GetComponent<RectTransform>();
@@ -251,12 +269,11 @@ internal static class SecondaryBackpackPanel
 
         var player = gui.m_player;
 
-        // Stay in the same anchor space as the player inventory panel.
         rt.anchorMin = player.anchorMin;
         rt.anchorMax = player.anchorMax;
         rt.pivot = player.pivot;
 
-        var contentSize = ApplyContentSize(rt, gui);
+        var contentSize = ApplyContentSize(rt);
         Canvas.ForceUpdateCanvases();
 
         var gap = ConfigRegistry.AlongsidePanelGap != null ? ConfigRegistry.AlongsidePanelGap.Value : 72f;
@@ -264,22 +281,19 @@ internal static class SecondaryBackpackPanel
         var scale = ConfigRegistry.AlongsidePanelScale != null ? ConfigRegistry.AlongsidePanelScale.Value : 1f;
         scale = Mathf.Clamp(scale, 0.5f, 1.5f);
 
-        // Top of the player inventory background box (not the taller player root).
+        // Top of inventory background; right past player + weight/armor chrome.
         var bkg = player.Find("Bkg") as RectTransform ?? player;
         var topY = GetLocalTop(parent, bkg);
 
-        // Clear weight / armor icons that sit to the right of the inventory.
         var rightX = GetLocalRight(parent, player);
         rightX = Mathf.Max(rightX, GetLocalRight(parent, gui.m_weight != null ? gui.m_weight.rectTransform : null));
         rightX = Mathf.Max(rightX, GetLocalRight(parent, gui.m_armor != null ? gui.m_armor.rectTransform : null));
 
-        // Desired top-left of our panel in parent local space.
-        var width = contentSize.x > 1f ? contentSize.x : rt.rect.width;
-        var height = contentSize.y > 1f ? contentSize.y : rt.rect.height;
+        var width = contentSize.x;
+        var height = contentSize.y;
         var localLeft = rightX + gap;
         var localTop = topY + offsetY;
 
-        // Convert top-left → anchoredPosition for the current pivot.
         var pivotLocal = new Vector2(
             localLeft + width * rt.pivot.x,
             localTop - height * (1f - rt.pivot.y));
@@ -289,65 +303,16 @@ internal static class SecondaryBackpackPanel
         rt.SetAsLastSibling();
     }
 
-    /// <summary>
-    /// Shrink the cloned chest chrome to roughly fit the backpack grid size.
-    /// Returns the intended on-screen content size used for positioning.
-    /// </summary>
-    private static Vector2 ApplyContentSize(RectTransform rt, InventoryGui gui)
+    private static Vector2 ApplyContentSize(RectTransform rt)
     {
         var inv = GetInventory();
-        if (inv == null || _grid == null)
-        {
-            rt.sizeDelta = gui.m_container.sizeDelta;
-            return rt.rect.size;
-        }
+        var cell = _grid != null && _grid.m_elementSpace > 1f ? _grid.m_elementSpace : DefaultCell;
 
-        var cell = _grid.m_elementSpace;
-        if (cell <= 1f)
-            cell = 64f;
+        int cols = inv != null && inv.m_width > 0 ? inv.m_width : 4;
+        int rows = inv != null && inv.m_height > 0 ? inv.m_height : 2;
 
-        // Estimate wood-frame padding from the original container vs its grid.
-        float padX = 70f;
-        float padY = 110f;
-        var templateGrid = gui.m_containerGrid != null
-            ? gui.m_containerGrid
-            : gui.m_container.GetComponentInChildren<InventoryGrid>(true);
-        if (templateGrid != null && templateGrid.m_width > 0 && templateGrid.m_height > 0)
-        {
-            var templateCell = templateGrid.m_elementSpace;
-            if (templateCell > 1f)
-            {
-                padX = Mathf.Max(40f, gui.m_container.rect.width - templateGrid.m_width * templateCell);
-                padY = Mathf.Max(70f, gui.m_container.rect.height - templateGrid.m_height * templateCell);
-            }
-        }
-
-        var content = new Vector2(inv.m_width * cell + padX, inv.m_height * cell + padY);
-
-        var template = gui.m_container;
-        var sizeDelta = template.sizeDelta;
-        var rect = template.rect;
-        if (Mathf.Abs(rect.width) > 1f && Mathf.Abs(rect.height) > 1f)
-        {
-            var stretchX = template.anchorMin.x != template.anchorMax.x;
-            var stretchY = template.anchorMin.y != template.anchorMax.y;
-            if (!stretchX && !stretchY)
-            {
-                sizeDelta = new Vector2(
-                    sizeDelta.x * (content.x / rect.width),
-                    sizeDelta.y * (content.y / rect.height));
-            }
-            else
-            {
-                sizeDelta = content;
-            }
-        }
-        else
-        {
-            sizeDelta = content;
-        }
-
-        rt.sizeDelta = sizeDelta;
+        var content = new Vector2(cols * cell + PadX, rows * cell + PadY);
+        rt.sizeDelta = content;
         return content;
     }
 
@@ -357,7 +322,6 @@ internal static class SecondaryBackpackPanel
             return float.MinValue;
 
         target.GetWorldCorners(CornerBuffer);
-        // corners: 0=bl, 1=tl, 2=tr, 3=br
         var a = parent.InverseTransformPoint(CornerBuffer[2]).x;
         var b = parent.InverseTransformPoint(CornerBuffer[3]).x;
         return Mathf.Max(a, b);
@@ -376,7 +340,6 @@ internal static class SecondaryBackpackPanel
 
     private static Vector2 ParentLocalToAnchored(RectTransform rt, RectTransform parent, Vector2 parentLocal)
     {
-        // Mirror Unity's anchoredPosition mapping for non-stretch and stretch anchors.
         var parentRect = parent.rect;
         var anchorMin = rt.anchorMin;
         var anchorMax = rt.anchorMax;

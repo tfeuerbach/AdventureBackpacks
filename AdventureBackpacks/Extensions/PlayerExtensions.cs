@@ -189,6 +189,16 @@ public static class PlayerExtensions
 
         backpack.UpdateContainerSizing(ref backpackContainer);
 
+        // Side-panel mode: one consistent window to the right of inventory (keeps chests open).
+        if (Configuration.ConfigRegistry.OpenAlongsideContainer != null &&
+            Configuration.ConfigRegistry.OpenAlongsideContainer.Value)
+        {
+            if (Features.SecondaryBackpackPanel.Show(instance, player))
+                return;
+
+            AdventureBackpacks.Log?.Warning("Side backpack panel failed to open; falling back to vanilla container slot.");
+        }
+
         InventoryGuiPatches.BackpackIsOpen = true;
         try
         {
