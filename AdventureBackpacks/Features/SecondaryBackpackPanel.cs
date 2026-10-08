@@ -65,15 +65,14 @@ internal static class SecondaryBackpackPanel
 
         _panel.SetActive(true);
 
-        // Size the chrome first, then rebuild the grid into that space.
+        // Size chrome first, then bind inventory like a vanilla container (player=null).
         Layout(gui);
-        if (!RebuildGrid(player, gui.m_dragItem))
+        if (!BindGrid(gui.m_dragItem, forceRebuild: true))
         {
             Hide();
             return false;
         }
 
-        // Re-apply position after size/grid settle.
         Layout(gui);
 
         InventoryGuiPatches.BackpackIsOpen = true;
@@ -116,8 +115,8 @@ internal static class SecondaryBackpackPanel
 
         try
         {
-            Layout(_gui);
-            RebuildGrid(player, _gui.m_dragItem);
+            // Soft refresh — same as InventoryGui.UpdateContainer (no hotbar bindings).
+            BindGrid(_gui.m_dragItem, forceRebuild: false);
             Layout(_gui);
         }
         catch (System.Exception ex)
@@ -137,7 +136,11 @@ internal static class SecondaryBackpackPanel
 
         _grid = _panel.GetComponentInChildren<InventoryGrid>(true);
         if (_grid != null)
+        {
             _grid.name = GridName;
+            // Drop any slots cloned from the open chest before first bind.
+            ClearGridRoot(_grid);
+        }
 
         _name = null;
 
@@ -167,7 +170,11 @@ internal static class SecondaryBackpackPanel
         }
     }
 
-    private static bool RebuildGrid(Player player, ItemDrop.ItemData dragItem)
+    /// <summary>
+    /// Bind backpack inventory the same way vanilla binds a chest:
+    /// UpdateInventory(inv, player: null, drag) so hotbar binding numbers stay off.
+    /// </summary>
+    private static bool BindGrid(ItemDrop.ItemData dragItem, bool forceRebuild)
     {
         var inv = GetInventory();
         if (_grid == null || inv == null)
@@ -175,35 +182,20 @@ internal static class SecondaryBackpackPanel
 
         try
         {
-            // Drop any cloned chest slots so UpdateGui lays out fresh for backpack dims.
-            if (_grid.m_elements != null)
+            if (forceRebuild)
             {
-                foreach (var element in _grid.m_elements)
-                {
-                    if (element != null)
-                        Object.Destroy(element.gameObject);
-                }
-
-                _grid.m_elements.Clear();
+                ClearGridRoot(_grid);
+                // Force UpdateGui's rebuild path when dimensions already match a prior bind.
+                _grid.m_width = 0;
+                _grid.m_height = 0;
             }
 
-            // Force UpdateGui's rebuild path (it skips when width/height already match).
-            _grid.m_width = 0;
-            _grid.m_height = 0;
+            // Vanilla InventoryGui.UpdateContainer passes null for Player — that hides "1"-"8" bindings.
+            _grid.UpdateInventory(inv, null, dragItem);
 
-            // Match the grid widget to the backpack content area before centering slots.
-            var gridRt = _grid.transform as RectTransform;
-            if (gridRt != null)
-            {
-                var cell = _grid.m_elementSpace > 1f ? _grid.m_elementSpace : 64f;
-                gridRt.sizeDelta = new Vector2(inv.m_width * cell, inv.m_height * cell);
-            }
+            if (forceRebuild)
+                _grid.ResetView();
 
-            Canvas.ForceUpdateCanvases();
-
-            _grid.UpdateInventory(inv, player, dragItem);
-            _grid.UpdateGui(player, dragItem);
-            _grid.ResetView();
             return true;
         }
         catch (System.Exception ex)
@@ -211,6 +203,37 @@ internal static class SecondaryBackpackPanel
             AdventureBackpacks.Log?.Warning($"Secondary backpack panel update failed: {ex.Message}");
             return false;
         }
+    }
+
+    private static void ClearGridRoot(InventoryGrid grid)
+    {
+        if (grid == null)
+            return;
+
+        if (grid.m_elements != null)
+        {
+            foreach (var element in grid.m_elements)
+            {
+                if (element != null)
+                    Object.DestroyImmediate(element.gameObject);
+            }
+
+            grid.m_elements.Clear();
+        }
+
+        // Orphaned visuals under the grid root (not tracked in m_elements).
+        if (grid.m_gridRoot != null)
+        {
+            for (var i = grid.m_gridRoot.childCount - 1; i >= 0; i--)
+            {
+                var child = grid.m_gridRoot.GetChild(i);
+                if (child != null)
+                    Object.DestroyImmediate(child.gameObject);
+            }
+        }
+
+        grid.m_width = 0;
+        grid.m_height = 0;
     }
 
     private static void Layout(InventoryGui gui)
