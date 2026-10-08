@@ -200,6 +200,20 @@ internal static class InventoryGuiPatches
         }
     }
     
+    public static bool TryOpenAlongsideContainer(Player player, InventoryGui instance)
+    {
+        if (player == null || instance == null)
+            return false;
+
+        if (!ConfigRegistry.OpenAlongsideContainer.Value)
+            return false;
+
+        if (instance.m_currentContainer == null || instance.m_currentContainer.IsBackpackProxy())
+            return false;
+
+        return SecondaryBackpackPanel.Show(instance, player);
+    }
+
     public static void ShowBackpack(Player player, InventoryGui instance)
     {
         if (player == null || instance == null)
@@ -211,14 +225,18 @@ internal static class InventoryGuiPatches
         }
     
         if (_showBackpack)
-        { 
+        {
+            _showBackpack = false;
+
+            if (TryOpenAlongsideContainer(player, instance))
+                return;
+
             if (!BackpackIsOpen && instance.m_currentContainer != null)
             {
                 instance.m_currentContainer.SetInUse(false);
                 instance.m_currentContainer = null;
             }
 
-            _showBackpack = false; 
             player.OpenBackpack(instance);
         }
     }
@@ -229,6 +247,17 @@ internal static class InventoryGuiPatches
         {
             if (BackpackIsOpen)
             {
+                if (SecondaryBackpackPanel.IsOpen)
+                {
+                    SecondaryBackpackPanel.Hide();
+                    BackpackIsOpen = false;
+
+                    if (ConfigRegistry.CloseInventory.Value && !ConfigRegistry.OpenWithHoverInteract.Value && instance != null)
+                        instance.Hide();
+
+                    return;
+                }
+
                 if (instance != null)
                 {
                     instance.CloseContainer();
@@ -246,6 +275,7 @@ internal static class InventoryGuiPatches
         catch (System.Exception ex)
         {
             BackpackIsOpen = false;
+            SecondaryBackpackPanel.Hide();
             AdventureBackpacks.Log?.Warning($"Error hiding backpack: {ex.Message}");
         }
     }
@@ -299,6 +329,9 @@ internal static class InventoryGuiPatches
 
         if (openBackpack & !CheckForTextInput())
         {
+            if (TryOpenAlongsideContainer(player, instance))
+                return false;
+
             if (instance.m_currentContainer != null)
             {
                 instance.m_currentContainer.SetInUse(false);
@@ -349,8 +382,16 @@ internal static class InventoryGuiPatches
 
             if (closeBackpack)
             {
-                instance.CloseContainer();
-                BackpackIsOpen = false;
+                if (SecondaryBackpackPanel.IsOpen)
+                {
+                    SecondaryBackpackPanel.Hide();
+                    BackpackIsOpen = false;
+                }
+                else
+                {
+                    instance.CloseContainer();
+                    BackpackIsOpen = false;
+                }
                 return false;
             }
         }
@@ -778,6 +819,75 @@ internal static class InventoryGuiPatches
         static void Postfix()
         {
             CraftingContext.Reset();
+            SecondaryBackpackPanel.Destroy();
+            BackpackIsOpen = false;
+        }
+    }
+
+    [HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.CloseContainer))]
+    static class InventoryGuiCloseContainerPatch
+    {
+        [HarmonyPrepare]
+        private static bool Prepare() => !PlayerExtensions.IsDedicatedOrHeadless();
+
+        [HarmonyPrefix]
+        static void Prefix(InventoryGui __instance, out bool __state)
+        {
+            // Closing a world chest while the secondary backpack panel is open:
+            // promote the backpack into the normal container slot afterwards.
+            __state = SecondaryBackpackPanel.IsOpen &&
+                      __instance != null &&
+                      __instance.m_currentContainer != null &&
+                      !__instance.m_currentContainer.IsBackpackProxy();
+        }
+
+        [HarmonyPostfix]
+        static void Postfix(InventoryGui __instance, bool __state)
+        {
+            if (!__state || __instance == null || Player.m_localPlayer == null)
+                return;
+
+            SecondaryBackpackPanel.Hide();
+            if (Player.m_localPlayer.CanOpenBackpack())
+            {
+                Player.m_localPlayer.OpenBackpack(__instance);
+            }
+            else
+            {
+                BackpackIsOpen = false;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.UpdateContainer))]
+    static class InventoryGuiUpdateContainerPatch
+    {
+        [HarmonyPrepare]
+        private static bool Prepare() => !PlayerExtensions.IsDedicatedOrHeadless();
+
+        [HarmonyPostfix]
+        static void Postfix(InventoryGui __instance, Player player)
+        {
+            if (!SecondaryBackpackPanel.IsOpen)
+                return;
+
+            if (player == null || __instance == null || __instance.m_currentContainer == null)
+            {
+                // World container went away; promote or clear.
+                if (SecondaryBackpackPanel.IsOpen && player != null && player.CanOpenBackpack())
+                {
+                    SecondaryBackpackPanel.Hide();
+                    player.OpenBackpack(__instance);
+                }
+                else
+                {
+                    SecondaryBackpackPanel.Hide();
+                    BackpackIsOpen = false;
+                }
+                return;
+            }
+
+            SecondaryBackpackPanel.Refresh(player);
         }
     }
 

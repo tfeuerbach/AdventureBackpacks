@@ -13,6 +13,7 @@ namespace AdventureBackpacks.Configuration
         internal static ConfigEntry<KeyboardShortcut> HotKeyDrop;
         internal static ConfigEntry<bool> OpenWithInventory;
         internal static ConfigEntry<bool> OpenWithHoverInteract;
+        internal static ConfigEntry<bool> OpenAlongsideContainer;
         internal static ConfigEntry<bool> CloseInventory;
         internal static ConfigEntry<bool> OutwardMode;
         internal static ConfigEntry<bool> ReplaceShader;
@@ -52,6 +53,10 @@ namespace AdventureBackpacks.Configuration
             UnsyncedConfig("Local Config", "Open with Interactive Hover", false,
                 new ConfigDescription("If enabled, backpack will only open while hovering over equipped backpack and pressing hotkey.  This option overrides Open with Inventory.",
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref OpenWithHoverInteract);
+
+            UnsyncedConfig("Local Config", "Open Alongside Container", false,
+                new ConfigDescription("If enabled, opening the backpack while a chest or other container is open keeps that container open and shows the backpack beside it.",
+                    null, new ConfigurationManagerAttributes { Order = 3 }), ref OpenAlongsideContainer);
             
             UnsyncedConfig("Local Config", "Close Inventory", true,
                 new ConfigDescription("If enabled, both backpack and inventory will close with Open Backpack keybind is pressed while Inventory is open.",
