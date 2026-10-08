@@ -61,12 +61,12 @@ namespace AdventureBackpacks.Configuration
                 new ConfigDescription("If enabled, opening the backpack while a chest or other container is open keeps that container open and shows the backpack beside it.",
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref OpenAlongsideContainer);
 
-            UnsyncedConfig("Local Config", "Alongside Panel Gap", 24f,
-                new ConfigDescription("Horizontal gap (pixels) between the player inventory and the secondary backpack panel when Open Alongside Container is enabled.",
+            UnsyncedConfig("Local Config", "Alongside Panel Gap", 72f,
+                new ConfigDescription("Horizontal gap (pixels) after the player inventory / weight / armor chrome before the secondary backpack panel.",
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref AlongsidePanelGap);
 
             UnsyncedConfig("Local Config", "Alongside Panel Offset Y", 0f,
-                new ConfigDescription("Vertical offset (pixels) for the secondary backpack panel. Positive moves it up.",
+                new ConfigDescription("Extra vertical offset (pixels) for the secondary backpack panel after aligning to the inventory background top. Positive moves it up.",
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref AlongsidePanelOffsetY);
 
             UnsyncedConfig("Local Config", "Alongside Panel Scale", 1f,

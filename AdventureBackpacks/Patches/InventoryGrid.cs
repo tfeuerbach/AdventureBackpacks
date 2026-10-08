@@ -18,6 +18,19 @@ public class InventoryGridPatches
         {
             if (!__instance.name.Equals("ContainerGrid")) return true;
 
+            // Secondary dual-open panel clones ContainerGrid; leave its sizing alone.
+            if (__instance.transform != null && __instance.transform.parent != null &&
+                __instance.transform.root != null)
+            {
+                var t = __instance.transform;
+                while (t != null)
+                {
+                    if (t.name == "AB_BackpackSecondary")
+                        return true;
+                    t = t.parent;
+                }
+            }
+
             if (__instance.m_elements.Count >= __instance.m_inventory.m_inventory.Count) return true;
             
             if ((__instance.m_width != __instance.m_inventory.m_width) ||
