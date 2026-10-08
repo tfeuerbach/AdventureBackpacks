@@ -356,3 +356,6 @@ MigrationBackup/
 **/[Ll]ibrary/
 **/[Tt]emp/
 **/PackageCache/
+
+.refs/
+
