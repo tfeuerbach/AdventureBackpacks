@@ -151,6 +151,82 @@ internal static class InventoryGuiPatches
         [HarmonyPrepare]
         private static bool Prepare() => !PlayerExtensions.IsDedicatedOrHeadless();
 
+        /// <summary>
+        /// Vanilla ctrl+click (Modifier.Move) only knows player ↔ m_currentContainer.
+        /// With the side backpack open, a click on the backpack is treated as "not the
+        /// chest", so vanilla runs chest.MoveItemToThis(playerInv, item) while the item
+        /// still lives in the backpack — that copies into the chest and never removes
+        /// from the bag (dupe). Handle any transfer that involves the backpack inventory.
+        /// </summary>
+        [UsedImplicitly]
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        static bool Prefix(InventoryGui __instance, InventoryGrid grid, ItemDrop.ItemData item, Vector2i pos, InventoryGrid.Modifier mod)
+        {
+            if (mod != InventoryGrid.Modifier.Move)
+                return true;
+
+            if (!SecondaryBackpackPanel.IsOpen || __instance == null || grid == null || item == null)
+                return true;
+
+            var player = Player.m_localPlayer;
+            if (player == null || player.IsTeleporting())
+                return true;
+
+            var playerInv = player.GetInventory();
+            var backpackInv = SecondaryBackpackPanel.GetInventory();
+            if (playerInv == null || backpackInv == null)
+                return true;
+
+            var from = grid.GetInventory();
+            if (from == null)
+                return true;
+
+            Inventory chestInv = null;
+            if (__instance.m_currentContainer != null && !__instance.m_currentContainer.IsBackpackProxy())
+                chestInv = __instance.m_currentContainer.GetInventory();
+
+            Inventory to;
+            if (from == backpackInv)
+            {
+                // Backpack → chest (if open), else player.
+                to = chestInv ?? playerInv;
+            }
+            else if (from == playerInv && chestInv == null)
+            {
+                // No chest: player → backpack (vanilla would have nowhere useful to send it).
+                to = backpackInv;
+            }
+            else if (from == chestInv && chestInv != null)
+            {
+                // Chest → player stays vanilla.
+                return true;
+            }
+            else if (from == playerInv && chestInv != null)
+            {
+                // Player → chest stays vanilla.
+                return true;
+            }
+            else
+            {
+                return true;
+            }
+
+            if (to == null || to == from)
+                return true;
+
+            if (item.m_shared != null && item.m_shared.m_questItem)
+                return false;
+
+            player.RemoveEquipAction(item);
+            player.UnequipItem(item, true);
+            to.MoveItemToThis(from, item);
+            if (__instance.m_moveItemEffects != null)
+                __instance.m_moveItemEffects.Create(__instance.transform.position, Quaternion.identity);
+
+            return false;
+        }
+
         [UsedImplicitly]
         static Exception Finalizer(Exception __exception, InventoryGrid grid, ItemDrop.ItemData item, Vector2i pos, InventoryGrid.Modifier mod, InventoryGui __instance)
         {
