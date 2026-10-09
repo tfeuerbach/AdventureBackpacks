@@ -1,0 +1,19 @@
+# Paths this fork owns. Merge conflicts here stop auto-sync and open a PR for review.
+# Everything else can take upstream on conflict.
+# Globs use git pathspec rules (prefix match / trailing /** for trees).
+
+AdventureBackpacks/Features/SecondaryBackpackPanel.cs
+AdventureBackpacks/Features/SidePanel/
+AdventureBackpacks/Features/StoreToBackpack.cs
+AdventureBackpacks/Patches/InventoryGui.cs
+AdventureBackpacks/Patches/Inventory.cs
+AdventureBackpacks/Patches/InventoryGrid.cs
+AdventureBackpacks/Extensions/PlayerExtensions.cs
+AdventureBackpacks/Configuration/ConfigRegistry.cs
+AdventureBackpacks.Tests/
+.github/workflows/fork-tests.yml
+.github/workflows/mirror-upstream.yml
+.github/fork-protected-paths.txt
+.github/upstream-sync-state.json
+.github/scripts/
+README.md

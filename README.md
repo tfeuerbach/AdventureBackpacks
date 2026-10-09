@@ -36,7 +36,31 @@ Pure unit + source-contract tests live in `AdventureBackpacks.Tests` (no Valheim
 dotnet test AdventureBackpacks.Tests/AdventureBackpacks.Tests.csproj
 ```
 
-GitHub Actions workflow: `.github/workflows/fork-tests.yml`.
+GitHub Actions: `.github/workflows/fork-tests.yml`.
+
+### Automatic upstream release mirror
+
+`.github/workflows/mirror-upstream.yml` checks [Vapok/AdventureBackpacks releases](https://github.com/Vapok/AdventureBackpacks/releases) a few times a day (and on manual dispatch).
+
+| Result | Behavior |
+| :--- | :--- |
+| No new release | No-op |
+| Clean merge (or only non-protected conflicts) **and tests pass** | Opens PR and **auto-merges** into `main` |
+| Conflict in a **protected** fork file | Opens PR labeled `needs-human`, fails the job, optional email — **does not** merge |
+| Tests fail after merge | Opens PR labeled `needs-human` / `tests-failed`, fails the job, optional email — **does not** merge |
+
+Protected paths: `.github/fork-protected-paths.txt` (side panel, transfer/overflow patches, tests, this README, sync workflows).
+
+**Optional email** when review is needed — add repo secrets:
+
+- `SYNC_NOTIFY_TO` — your email
+- `SYNC_SMTP_SERVER` / `SYNC_SMTP_PORT` (usually `587`)
+- `SYNC_SMTP_USER` / `SYNC_SMTP_PASS`
+- `SYNC_SMTP_FROM` — optional From address
+
+Without SMTP secrets you still get a GitHub PR + failed workflow notification. Watch the repo (or Actions) so those ping you.
+
+Manual run: Actions → **Mirror upstream release** → Run workflow (optional tag / force).
 
 ---
 
