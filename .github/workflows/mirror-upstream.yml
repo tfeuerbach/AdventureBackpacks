@@ -7,12 +7,8 @@
 # 4. Conflicts inside protected paths → open PR + notify; do NOT touch main.
 # 5. Clean / auto-resolved merge → run fork regression tests.
 # 6. Tests pass → auto-merge PR into main.
-# 7. Tests fail → leave PR open + notify; do NOT merge.
-#
-# Optional email when human review is needed — set repo secrets:
-#   SYNC_NOTIFY_TO, SYNC_SMTP_SERVER, SYNC_SMTP_PORT, SYNC_SMTP_USER, SYNC_SMTP_PASS
-#   SYNC_SMTP_FROM (optional)
-# Without SMTP secrets, rely on the open PR + failed workflow notification.
+# 7. Tests fail → leave PR open; do NOT merge.
+# Notification = failed Actions run (watch the repo) + open PR labeled needs-human.
 
 name: Mirror upstream release
 
@@ -217,65 +213,6 @@ jobs:
           gh pr merge "${{ steps.pr.outputs.pr_url }}" --merge --delete-branch \
             --subject "chore: sync upstream ${{ steps.mirror.outputs.latest_tag }}"
           echo "Auto-merged ${{ steps.pr.outputs.pr_url }}"
-
-      - name: Email on conflict or test failure
-        if: |
-          always() &&
-          steps.mirror.outputs.already_synced != 'true' &&
-          (steps.mirror.outputs.needs_human == 'true' || steps.tests.outputs.passed == 'false')
-        continue-on-error: true
-        env:
-          SYNC_NOTIFY_TO: ${{ secrets.SYNC_NOTIFY_TO }}
-          SYNC_SMTP_SERVER: ${{ secrets.SYNC_SMTP_SERVER }}
-          SYNC_SMTP_PORT: ${{ secrets.SYNC_SMTP_PORT }}
-          SYNC_SMTP_USER: ${{ secrets.SYNC_SMTP_USER }}
-          SYNC_SMTP_PASS: ${{ secrets.SYNC_SMTP_PASS }}
-          SYNC_SMTP_FROM: ${{ secrets.SYNC_SMTP_FROM }}
-          TAG: ${{ steps.mirror.outputs.latest_tag }}
-          URL: ${{ steps.mirror.outputs.latest_url }}
-          NEEDS_HUMAN: ${{ steps.mirror.outputs.needs_human }}
-          PR: ${{ steps.pr.outputs.pr_url }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          CONFLICTS: ${{ steps.mirror.outputs.protected_conflicts }}
-        run: |
-          if [ -z "${SYNC_NOTIFY_TO:-}" ] || [ -z "${SYNC_SMTP_SERVER:-}" ] || [ -z "${SYNC_SMTP_USER:-}" ] || [ -z "${SYNC_SMTP_PASS:-}" ]; then
-            echo "SMTP secrets not configured; skipping email (PR + failed job still notify via GitHub)."
-            exit 0
-          fi
-          export FROM="${SYNC_SMTP_FROM:-$SYNC_SMTP_USER}"
-          if [ "${NEEDS_HUMAN}" = "true" ]; then
-            export REASON="protected-path conflict"
-          else
-            export REASON="fork tests failed"
-          fi
-          python - <<'PY'
-          import os, smtplib, ssl
-          from email.message import EmailMessage
-          msg = EmailMessage()
-          msg["Subject"] = f"[AdventureBackpacks fork] upstream {os.environ['TAG']} needs review"
-          msg["From"] = os.environ["FROM"]
-          msg["To"] = os.environ["SYNC_NOTIFY_TO"]
-          msg.set_content(
-          f"""Upstream sync needs your attention.
-
-          Tag: {os.environ['TAG']}
-          Release: {os.environ['URL']}
-          Reason: {os.environ['REASON']}
-          PR: {os.environ.get('PR', '')}
-          Workflow: {os.environ['RUN_URL']}
-
-          Protected conflicts:
-          {os.environ.get('CONFLICTS', '')}
-          """
-          )
-          port = int(os.environ.get("SYNC_SMTP_PORT") or "587")
-          context = ssl.create_default_context()
-          with smtplib.SMTP(os.environ["SYNC_SMTP_SERVER"], port, timeout=30) as s:
-              s.starttls(context=context)
-              s.login(os.environ["SYNC_SMTP_USER"], os.environ["SYNC_SMTP_PASS"])
-              s.send_message(msg)
-          print("Email sent.")
-          PY
 
       - name: Fail job when human needed or tests failed
         if: |
