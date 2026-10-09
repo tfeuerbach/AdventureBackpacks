@@ -17,4 +17,5 @@ AdventureBackpacks.Tests/
 .github/fork-protected-paths.txt
 .github/upstream-sync-state.json
 .github/scripts/
+manifest.json
 README.md

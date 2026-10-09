@@ -243,7 +243,7 @@
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DevPluginsFolder)/Vapok-$(ProjectName)" SkipUnchangedFiles="true" />
         <Copy SourceFiles="@(DevTranslationFiles)" DestinationFolder="$(DevPluginsFolder)/Vapok-$(ProjectName)/Translations" SkipUnchangedFiles="true" />
     </Target>
-    <Target Name="Copy" AfterTargets="ILRepack" Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <Target Name="Copy" AfterTargets="ILRepack" Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' and '$(SkipReleaseCopy)' != 'true' ">
         <ItemGroup>
             <TranslationFiles Include="$(ModRoot)/$(ProjectName)/Translations/*.json" />
             <PackageDocs Include="$(ModRoot)/$(ProjectName)/LICENSE.md;$(ModRoot)/$(ProjectName)/manifest.json;$(ModRoot)/$(ProjectName)/CHANGELOG.md;$(ModRoot)/$(ProjectName)/README.md;$(ModRoot)/$(ProjectName)/icon.png" />

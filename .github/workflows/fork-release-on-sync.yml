@@ -1,5 +1,9 @@
 # When a sync PR is merged manually (needs-human path), publish the fork release
-# tag as <upstreamTag>a — same as the automatic mirror path.
+# with the same tag as upstream and attach the Thunderstore zip.
+# Also covers the auto-merge path if the mirror package-release job lost a race;
+# create-fork-release.sh is idempotent when the release/asset already exists.
+#
+# Requires repository secret VALHEIM_REFS_URL (zip of .refs).
 
 name: Fork release on sync merge
 
@@ -11,12 +15,16 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: fork-release-package
+  cancel-in-progress: false
+
 jobs:
   release:
     if: >
       github.event.pull_request.merged == true &&
       startsWith(github.event.pull_request.head.ref, 'sync/upstream-')
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,12 +33,14 @@ jobs:
           ref: main
 
       - name: Configure git identity
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Derive upstream tag and ensure sync state
         id: meta
+        shell: bash
         run: |
           set -euo pipefail
           BRANCH="${{ github.event.pull_request.head.ref }}"
@@ -61,10 +71,42 @@ jobs:
             git push origin main
           fi
 
-      - name: Publish fork release
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore Valheim refs
+        shell: bash
+        env:
+          VALHEIM_REFS_URL: ${{ secrets.VALHEIM_REFS_URL }}
+        run: |
+          chmod +x .github/scripts/restore-valheim-refs.sh
+          .github/scripts/restore-valheim-refs.sh
+
+      - name: Build Release and package Thunderstore zip
+        id: package
+        shell: bash
+        run: |
+          chmod +x .github/scripts/build-and-package.sh .github/scripts/package-thunderstore.sh
+          .github/scripts/build-and-package.sh "${{ steps.meta.outputs.upstream_tag }}"
+          ZIP="$(ls dist/tfeuerbach-AdventureBackpacks-*.zip | head -n1)"
+          echo "zip_path=${ZIP}" >> "$GITHUB_OUTPUT"
+          echo "Packaged ${ZIP}"
+
+      - name: Publish fork release with zip
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_ZIP: ${{ steps.package.outputs.zip_path }}
         run: |
           chmod +x .github/scripts/create-fork-release.sh
           TARGET_COMMIT="$(git rev-parse HEAD)" \
+            PACKAGE_ZIP="$PACKAGE_ZIP" \
             .github/scripts/create-fork-release.sh "${{ steps.meta.outputs.upstream_tag }}"

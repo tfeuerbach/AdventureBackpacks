@@ -1,1 +1,4 @@
 UnityProjects/vapoksbackpacks/vapoksbackpacks/Library/ArtifactDB filter=lfs diff=lfs merge=lfs -text lockable
+
+# Keep CI shell scripts runnable under bash (no CRLF).
+.github/scripts/*.sh text eol=lf

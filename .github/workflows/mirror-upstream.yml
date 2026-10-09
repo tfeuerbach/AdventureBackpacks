@@ -6,11 +6,13 @@
 # 3. Conflicts outside .github/fork-protected-paths.txt → take upstream automatically.
 # 4. Conflicts inside protected paths → open PR + notify; do NOT touch main.
 # 5. Clean / auto-resolved merge → run fork regression tests.
-# 6. Tests pass → auto-merge PR into main, then publish fork release <upstreamTag>a
-#    (e.g. upstream v2.2.11 → fork release v2.2.11a).
+# 6. Tests pass → auto-merge PR into main, then publish fork release with the
+#    same tag as upstream (e.g. v2.2.11) and attach tfeuerbach-AdventureBackpacks-*.zip.
 # 7. Tests fail → leave PR open; do NOT merge / do NOT release.
 # Notification = failed Actions run (watch the repo) + open PR labeled needs-human.
 # Manual sync PR merges are covered by fork-release-on-sync.yml.
+#
+# Packaging needs repository secret VALHEIM_REFS_URL → zip of .refs (BepInEx, Valheim, APIManager).
 
 name: Mirror upstream release
 
@@ -41,6 +43,12 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    outputs:
+      already_synced: ${{ steps.mirror.outputs.already_synced }}
+      needs_human: ${{ steps.mirror.outputs.needs_human }}
+      tests_passed: ${{ steps.tests.outputs.passed }}
+      latest_tag: ${{ steps.mirror.outputs.latest_tag }}
+      should_release: ${{ steps.release_gate.outputs.should_release }}
 
     steps:
       - name: Checkout fork
@@ -158,6 +166,7 @@ jobs:
           - Merge status: \`${STATUS}\`
           - Fork regression tests: **passed**
           - This PR will be auto-merged into \`main\`.
+          - Fork release \`${TAG}\` (Thunderstore zip) publishes after merge.
           EOF
           )
             LABEL_ARGS=(--label upstream-sync --label auto)
@@ -216,19 +225,16 @@ jobs:
             --subject "chore: sync upstream ${{ steps.mirror.outputs.latest_tag }}"
           echo "Auto-merged ${{ steps.pr.outputs.pr_url }}"
 
-      - name: Publish fork release (upstream tag + a)
-        if: |
-          steps.mirror.outputs.already_synced != 'true' &&
-          steps.mirror.outputs.needs_human != 'true' &&
-          steps.tests.outputs.passed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release gate
+        id: release_gate
         run: |
-          set -euo pipefail
-          git fetch origin main
-          chmod +x .github/scripts/create-fork-release.sh
-          TARGET_COMMIT="$(git rev-parse origin/main)" \
-            .github/scripts/create-fork-release.sh "${{ steps.mirror.outputs.latest_tag }}"
+          if [ "${{ steps.mirror.outputs.already_synced }}" != "true" ] && \
+             [ "${{ steps.mirror.outputs.needs_human }}" != "true" ] && \
+             [ "${{ steps.tests.outputs.passed }}" = "true" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Fail job when human needed or tests failed
         if: |
@@ -237,3 +243,63 @@ jobs:
         run: |
           echo "::error::Upstream sync paused for review. PR: ${{ steps.pr.outputs.pr_url }}"
           exit 1
+
+  package-release:
+    needs: sync
+    if: needs.sync.outputs.should_release == 'true'
+    runs-on: windows-latest
+    concurrency:
+      group: fork-release-package
+      cancel-in-progress: false
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure git identity
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore Valheim refs
+        shell: bash
+        env:
+          VALHEIM_REFS_URL: ${{ secrets.VALHEIM_REFS_URL }}
+        run: |
+          chmod +x .github/scripts/restore-valheim-refs.sh
+          .github/scripts/restore-valheim-refs.sh
+
+      - name: Build Release and package Thunderstore zip
+        id: package
+        shell: bash
+        run: |
+          chmod +x .github/scripts/build-and-package.sh .github/scripts/package-thunderstore.sh
+          .github/scripts/build-and-package.sh "${{ needs.sync.outputs.latest_tag }}"
+          ZIP="$(ls dist/tfeuerbach-AdventureBackpacks-*.zip | head -n1)"
+          echo "zip_path=${ZIP}" >> "$GITHUB_OUTPUT"
+          echo "Packaged ${ZIP}"
+
+      - name: Publish fork release with zip
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_ZIP: ${{ steps.package.outputs.zip_path }}
+        run: |
+          chmod +x .github/scripts/create-fork-release.sh
+          TARGET_COMMIT="$(git rev-parse HEAD)" \
+            PACKAGE_ZIP="$PACKAGE_ZIP" \
+            .github/scripts/create-fork-release.sh "${{ needs.sync.outputs.latest_tag }}"
