@@ -25,6 +25,7 @@ internal static class SecondaryBackpackPanel
     private static GameObject _panel;
     private static InventoryGrid _grid;
     private static TMP_Text _name;
+    private static TMP_Text _weight;
     private static InventoryGui _gui;
     private static Container _backpackContainer;
     private static readonly Vector3[] CornerBuffer = new Vector3[4];
@@ -78,6 +79,7 @@ internal static class SecondaryBackpackPanel
             return false;
         }
 
+        UpdateWeightLabel();
         Layout(gui);
 
         InventoryGuiPatches.BackpackIsOpen = true;
@@ -101,6 +103,7 @@ internal static class SecondaryBackpackPanel
             _panel = null;
             _grid = null;
             _name = null;
+            _weight = null;
             _gui = null;
         }
     }
@@ -121,6 +124,7 @@ internal static class SecondaryBackpackPanel
         try
         {
             BindGrid(_gui.m_dragItem, forceRebuild: false);
+            UpdateWeightLabel();
             Layout(_gui);
         }
         catch (System.Exception ex)
@@ -163,6 +167,19 @@ internal static class SecondaryBackpackPanel
         if (_name == null)
             _name = _panel.GetComponentInChildren<TMP_Text>(true);
 
+        _weight = null;
+        if (gui.m_containerWeight != null)
+        {
+            foreach (var tmp in _panel.GetComponentsInChildren<TMP_Text>(true))
+            {
+                if (tmp.name == gui.m_containerWeight.name)
+                {
+                    _weight = tmp;
+                    break;
+                }
+            }
+        }
+
         // Take All / Stack All would target m_currentContainer (the chest). Hide them.
         foreach (var button in _panel.GetComponentsInChildren<Button>(true))
         {
@@ -192,6 +209,21 @@ internal static class SecondaryBackpackPanel
 
         if (_grid.m_uiGroup != null)
             _grid.m_uiGroup.gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// Mirror InventoryGui.UpdateContainerWeight for the side panel badge.
+    /// Shows raw contents weight (same as a chest). Player carry weight already
+    /// includes contents × backpack WeightMultiplier via ItemData.GetWeight.
+    /// </summary>
+    private static void UpdateWeightLabel()
+    {
+        if (_weight == null)
+            return;
+
+        var inv = GetInventory();
+        var total = inv != null ? Mathf.CeilToInt(inv.GetTotalWeight()) : 0;
+        _weight.text = total.ToString();
     }
 
     private static bool BindGrid(ItemDrop.ItemData dragItem, bool forceRebuild)
