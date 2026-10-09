@@ -1,19 +1,44 @@
 <div align="center">
 
-# 🎒 Adventure Backpacks
+# 🎒 Adventure Backpacks *(fork)*
 
 ### *A progression-based adventuring backpack mod for Valheim.*
 
-[![GitHub Release](https://img.shields.io/github/v/release/Vapok/AdventureBackpacks?include_prereleases&logo=github&style=for-the-badge)](https://github.com/Vapok/AdventureBackpacks/releases)
-[![Thunderstore Version](https://img.shields.io/thunderstore/v/Vapok/AdventureBackpacks?logo=thunderstore&style=for-the-badge)](https://thunderstore.io/c/valheim/p/Vapok/AdventureBackpacks/)
-[![Nexus Mods](https://img.shields.io/badge/Nexus_Mods-Available-da8e35?logo=nexusmods&style=for-the-badge)](https://www.nexusmods.com/valheim/mods/2204)
-<br>
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-7289da?logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/5YAJkRFBXt)
+[![Upstream](https://img.shields.io/badge/upstream-Vapok%2FAdventureBackpacks-blue?style=for-the-badge&logo=github)](https://github.com/Vapok/AdventureBackpacks)
+[![Fork](https://img.shields.io/badge/fork-tfeuerbach%2FAdventureBackpacks-informational?style=for-the-badge&logo=github)](https://github.com/tfeuerbach/AdventureBackpacks)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 ---
 
 </div>
+
+> **This is an unofficial fork** of [Vapok/AdventureBackpacks](https://github.com/Vapok/AdventureBackpacks).  
+> Credit for the mod, assets, and ongoing upstream development belongs to **Vapok** and contributors.  
+> This fork tracks upstream `main` and adds a local feature that was declined upstream ([issue #204](https://github.com/Vapok/AdventureBackpacks/issues/204) — closed as wontfix).
+
+### Fork addition: Open backpack beside chests
+
+With **Open Alongside Container** enabled (Local Config), the equipped backpack always opens in a **side panel to the right of the player inventory** — the same window whether empty or filled, with or without a world chest open.
+
+- Keep a chest (or other container) open while using the backpack
+- Drag items between player inventory, chest, and backpack
+- Ctrl+click transfers involve the backpack without duping
+- Inventory overflow into the backpack still works while looting chests
+- Optional layout tweaks: `Alongside Panel Gap`, `Alongside Panel Offset Y`, `Alongside Panel Scale`
+
+Default for this option remains **off** in config (opt-in). Upstream behavior is unchanged when it is disabled.
+
+### Fork regression tests
+
+Pure unit + source-contract tests live in `AdventureBackpacks.Tests` (no Valheim install required). Run before/after mirroring upstream:
+
+```bash
+dotnet test AdventureBackpacks.Tests/AdventureBackpacks.Tests.csproj
+```
+
+GitHub Actions workflow: `.github/workflows/fork-tests.yml`.
+
+---
 
 Starting as a wee Viking rummaging through the tranquil fields of the Meadows, you'll gather materials that lead to your destiny. From Deer Hide and Leather Scraps to mystical Wisp-infused fabrics, you'll learn how to craft, upgrade, and customize your very own **Adventure Backpacks**! Go forth and wander, ye wanderer of the wanders!
 
@@ -66,6 +91,7 @@ Starting as a wee Viking rummaging through the tranquil fields of the Meadows, y
 | **Toggle Backpack** | <kbd>I</kbd> *(Default)* | Opens or closes your equipped backpack inventory. |
 | **Hover Interaction** | *Hover + Hotkey* | Hover over an equipped backpack in your main inventory and press the hotkey to open it directly. |
 | **Open with Inventory** | *Configurable* | Automatically opens your backpack inventory whenever you open your player inventory. |
+| **Open Alongside Container** | *Configurable (fork)* | Opens the backpack in a side panel to the right of inventory; keeps world chests open for dual looting. |
 | **Outward Quick Drop** | <kbd>Y</kbd> *(Default)* | Press while moving to immediately detach and drop your backpack behind you to escape danger. |
 | **Gamepad / Controller** | 🎮 Native | Full controller navigation support for opening, closing, and managing backpack inventories. |
 

@@ -15,6 +15,7 @@ using TMPro;
 using UnityEngine;
 using Vapok.Common.Managers;
 using AdventureBackpacks.Features;
+using AdventureBackpacks.Features.SidePanel;
 
 namespace AdventureBackpacks.Patches;
 
@@ -186,43 +187,23 @@ internal static class InventoryGuiPatches
             if (__instance.m_currentContainer != null && !__instance.m_currentContainer.IsBackpackProxy())
                 chestInv = __instance.m_currentContainer.GetInventory();
 
-            Inventory to;
-            if (from == backpackInv)
-            {
-                // Backpack → chest (if open), else player.
-                to = chestInv ?? playerInv;
-            }
-            else if (from == playerInv && chestInv == null)
-            {
-                // No chest: player → backpack (vanilla would have nowhere useful to send it).
-                to = backpackInv;
-            }
-            else if (from == chestInv && chestInv != null)
-            {
-                // Chest → player if it fits; otherwise → backpack (overflow).
-                if (StoreToBackpack.CanInventoryAccept(playerInv, item, item.m_stack))
-                    return true;
+            var fromKind = ClassifyInventory(from, playerInv, backpackInv, chestInv);
+            var decision = SidePanelTransferRules.ResolveCtrlClick(
+                fromKind,
+                chestOpen: chestInv != null,
+                playerCanAccept: StoreToBackpack.CanInventoryAccept(playerInv, item, item.m_stack),
+                backpackCanAccept: StoreToBackpack.CanInventoryAccept(backpackInv, item, item.m_stack),
+                isQuestItem: item.m_shared != null && item.m_shared.m_questItem);
 
-                if (!StoreToBackpack.CanInventoryAccept(backpackInv, item, item.m_stack))
-                    return true;
-
-                to = backpackInv;
-            }
-            else if (from == playerInv && chestInv != null)
-            {
-                // Player → chest stays vanilla.
+            if (decision.Action == SidePanelMoveAction.DeferToVanilla)
                 return true;
-            }
-            else
-            {
-                return true;
-            }
 
+            if (decision.Action == SidePanelMoveAction.Block)
+                return false;
+
+            var to = ResolveInventory(decision.To, playerInv, backpackInv, chestInv);
             if (to == null || to == from)
                 return true;
-
-            if (item.m_shared != null && item.m_shared.m_questItem)
-                return false;
 
             player.RemoveEquipAction(item);
             player.UnequipItem(item, true);
@@ -231,6 +212,42 @@ internal static class InventoryGuiPatches
                 __instance.m_moveItemEffects.Create(__instance.transform.position, Quaternion.identity);
 
             return false;
+        }
+
+        private static SidePanelInventoryKind ClassifyInventory(
+            Inventory inventory,
+            Inventory playerInv,
+            Inventory backpackInv,
+            Inventory chestInv)
+        {
+            if (inventory == null)
+                return SidePanelInventoryKind.Unknown;
+            if (inventory == playerInv)
+                return SidePanelInventoryKind.Player;
+            if (inventory == backpackInv)
+                return SidePanelInventoryKind.Backpack;
+            if (chestInv != null && inventory == chestInv)
+                return SidePanelInventoryKind.Chest;
+            return SidePanelInventoryKind.Unknown;
+        }
+
+        private static Inventory ResolveInventory(
+            SidePanelInventoryKind kind,
+            Inventory playerInv,
+            Inventory backpackInv,
+            Inventory chestInv)
+        {
+            switch (kind)
+            {
+                case SidePanelInventoryKind.Player:
+                    return playerInv;
+                case SidePanelInventoryKind.Backpack:
+                    return backpackInv;
+                case SidePanelInventoryKind.Chest:
+                    return chestInv;
+                default:
+                    return null;
+            }
         }
 
         [UsedImplicitly]

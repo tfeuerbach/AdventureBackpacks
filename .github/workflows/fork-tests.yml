@@ -1,0 +1,21 @@
+name: Fork regression tests
+
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore & test (no Valheim refs required)
+        run: dotnet test AdventureBackpacks.Tests/AdventureBackpacks.Tests.csproj --configuration Release --verbosity minimal

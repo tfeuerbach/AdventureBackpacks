@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AdventureBackpacks.Tests</RootNamespace>
+    <!-- Fork regression suite: runs without Valheim / BepInEx assemblies. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Compile the pure side-panel rules directly (no Valheim dependency). -->
+  <ItemGroup>
+    <Compile Include="..\AdventureBackpacks\Features\SidePanel\SidePanelTransferRules.cs" Link="SidePanel\SidePanelTransferRules.cs" />
+    <Compile Include="..\AdventureBackpacks\Features\SidePanel\SidePanelLayoutMath.cs" Link="SidePanel\SidePanelLayoutMath.cs" />
+  </ItemGroup>
+
+</Project>

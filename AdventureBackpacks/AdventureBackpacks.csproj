@@ -202,6 +202,8 @@
         <Compile Include="Compats\ContentsWithin.cs" />
         <Compile Include="Features\Utilities.cs" />
         <Compile Include="Features\SecondaryBackpackPanel.cs" />
+        <Compile Include="Features\SidePanel\SidePanelLayoutMath.cs" />
+        <Compile Include="Features\SidePanel\SidePanelTransferRules.cs" />
         <Compile Include="Patches\InventoryGrid.cs" />
         <Compile Include="Patches\ItemStand.cs" />
         <EmbeddedResource Include="Assets\Bundles\backpack_black_forest" />

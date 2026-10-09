@@ -1,5 +1,6 @@
 using AdventureBackpacks.Configuration;
 using AdventureBackpacks.Extensions;
+using AdventureBackpacks.Features.SidePanel;
 using AdventureBackpacks.Patches;
 using TMPro;
 using UnityEngine;
@@ -323,14 +324,19 @@ internal static class SecondaryBackpackPanel
 
         var width = contentSize.x;
         var height = contentSize.y;
-        var localLeft = rightX + gap;
-        var localTop = topY + offsetY;
+        SidePanelLayoutMath.TopLeftFromAnchors(rightX, topY, gap, offsetY, out var localLeft, out var localTop);
+        SidePanelLayoutMath.PivotFromTopLeft(
+            localLeft, localTop, width, height, rt.pivot.x, rt.pivot.y,
+            out var pivotLocalX, out var pivotLocalY);
 
-        var pivotLocal = new Vector2(
-            localLeft + width * rt.pivot.x,
-            localTop - height * (1f - rt.pivot.y));
+        var parentRect = parent.rect;
+        SidePanelLayoutMath.ParentLocalToAnchored(
+            pivotLocalX, pivotLocalY,
+            parentRect.xMin, parentRect.xMax, parentRect.yMin, parentRect.yMax,
+            rt.anchorMin.x, rt.anchorMax.x, rt.anchorMin.y, rt.anchorMax.y,
+            out var anchoredX, out var anchoredY);
 
-        rt.anchoredPosition = ParentLocalToAnchored(rt, parent, pivotLocal);
+        rt.anchoredPosition = new Vector2(anchoredX, anchoredY);
         rt.localScale = Vector3.one * scale;
         rt.SetAsLastSibling();
     }
@@ -343,7 +349,9 @@ internal static class SecondaryBackpackPanel
         int cols = inv != null && inv.m_width > 0 ? inv.m_width : 4;
         int rows = inv != null && inv.m_height > 0 ? inv.m_height : 2;
 
-        var content = new Vector2(cols * cell + PadX, rows * cell + PadY);
+        var content = new Vector2(
+            SidePanelLayoutMath.ContentWidth(cols, cell, PadX),
+            SidePanelLayoutMath.ContentHeight(rows, cell, PadY));
         rt.sizeDelta = content;
         return content;
     }
@@ -370,15 +378,4 @@ internal static class SecondaryBackpackPanel
         return Mathf.Max(a, b);
     }
 
-    private static Vector2 ParentLocalToAnchored(RectTransform rt, RectTransform parent, Vector2 parentLocal)
-    {
-        var parentRect = parent.rect;
-        var anchorMin = rt.anchorMin;
-        var anchorMax = rt.anchorMax;
-        var anchorRef = new Vector2(
-            Mathf.Lerp(parentRect.xMin, parentRect.xMax, (anchorMin.x + anchorMax.x) * 0.5f),
-            Mathf.Lerp(parentRect.yMin, parentRect.yMax, (anchorMin.y + anchorMax.y) * 0.5f));
-
-        return parentLocal - anchorRef;
-    }
 }

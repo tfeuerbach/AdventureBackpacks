@@ -3,6 +3,7 @@ using AdventureBackpacks.Assets;
 using AdventureBackpacks.Components;
 using AdventureBackpacks.Configuration;
 using AdventureBackpacks.Extensions;
+using AdventureBackpacks.Features.SidePanel;
 using AdventureBackpacks.Patches;
 using BepInEx.Configuration;
 using UnityEngine;
@@ -52,7 +53,9 @@ public static class StoreToBackpack
             return false;
 
         // Suppress only when the backpack is the vanilla container slot (not the side panel).
-        if (InventoryGuiPatches.BackpackIsOpen && !SecondaryBackpackPanel.IsOpen)
+        if (!SidePanelTransferRules.AllowAutoStoreWhileBackpackUiOpen(
+                InventoryGuiPatches.BackpackIsOpen,
+                SecondaryBackpackPanel.IsOpen))
             return false;
 
         if (!player.IsBackpackEquipped())
@@ -128,11 +131,9 @@ public static class StoreToBackpack
         if (player == null || item?.m_shared == null)
             return false;
 
-        if (item.IsBackpack() || item.TryGetBackpackItem(out _))
-            return false;
-
+        var isBackpackItem = item.IsBackpack() || item.TryGetBackpackItem(out _);
         var playerInventory = player.GetInventory();
-        if (playerInventory == null || CanInventoryAccept(playerInventory, item, item.m_stack))
+        if (playerInventory == null)
             return false;
 
         if (!player.IsBackpackEquipped())
@@ -143,8 +144,12 @@ public static class StoreToBackpack
         if (backpackInventory?.m_inventory == null)
             return false;
 
-        // Item is already in the backpack — do not "overflow" it back onto itself.
-        if (backpackInventory.m_inventory.Contains(item))
+        if (!SidePanelTransferRules.ShouldOverflowIntoBackpack(
+                EnableInventoryOverflowToBackpack.Value,
+                playerCanAccept: CanInventoryAccept(playerInventory, item, item.m_stack),
+                backpackCanAccept: CanInventoryAccept(backpackInventory, item, item.m_stack),
+                itemAlreadyInBackpack: backpackInventory.m_inventory.Contains(item),
+                isBackpackOrBackpackItem: isBackpackItem))
             return false;
 
         return TryStoreItem(player, item, backpackInventory);
