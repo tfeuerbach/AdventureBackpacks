@@ -199,8 +199,14 @@ internal static class InventoryGuiPatches
             }
             else if (from == chestInv && chestInv != null)
             {
-                // Chest → player stays vanilla.
-                return true;
+                // Chest → player if it fits; otherwise → backpack (overflow).
+                if (StoreToBackpack.CanInventoryAccept(playerInv, item, item.m_stack))
+                    return true;
+
+                if (!StoreToBackpack.CanInventoryAccept(backpackInv, item, item.m_stack))
+                    return true;
+
+                to = backpackInv;
             }
             else if (from == playerInv && chestInv != null)
             {

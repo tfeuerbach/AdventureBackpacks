@@ -292,6 +292,22 @@ public static class InventoryPatches
                     return false;
                 }
 
+                // Container transfers set _movingItemBetweenContainers, which used to skip
+                // overflow — still report room if the backpack can take the item.
+                if (_movingItemBetweenContainers &&
+                    StoreToBackpack.EnableInventoryOverflowToBackpack != null &&
+                    StoreToBackpack.EnableInventoryOverflowToBackpack.Value &&
+                    Player.m_localPlayer.IsBackpackEquipped())
+                {
+                    var bp = Player.m_localPlayer.GetEquippedBackpack()?.GetInventory();
+                    if (bp != null && (bp.m_inventory == null || !bp.m_inventory.Contains(item)) &&
+                        StoreToBackpack.CanInventoryAccept(bp, item, stack))
+                    {
+                        __result = true;
+                        return false;
+                    }
+                }
+
                 return true;
             }
             finally
@@ -328,29 +344,38 @@ public static class InventoryPatches
                 }
             }
 
-            if (Player.m_localPlayer != null && __instance == Player.m_localPlayer.GetInventory() && !_movingItemBetweenContainers)
+            if (Player.m_localPlayer != null && __instance == Player.m_localPlayer.GetInventory())
             {
-                if (CraftingContext.IsActive && !item.IsBackpack() && !item.TryGetBackpackItem(out _) && CraftFromBackpack.CanCraftOutputToBackpack(Player.m_localPlayer, out Inventory craftBpInventory))
+                if (!_movingItemBetweenContainers)
                 {
-                    if (!StoreToBackpack.CanInventoryAccept(__instance, item, item.m_stack))
+                    if (CraftingContext.IsActive && !item.IsBackpack() && !item.TryGetBackpackItem(out _) && CraftFromBackpack.CanCraftOutputToBackpack(Player.m_localPlayer, out Inventory craftBpInventory))
                     {
-                        bool fullyStoredCraft = StoreToBackpack.TryStoreItem(Player.m_localPlayer, item, craftBpInventory);
-                        if (fullyStoredCraft)
+                        if (!StoreToBackpack.CanInventoryAccept(__instance, item, item.m_stack))
+                        {
+                            bool fullyStoredCraft = StoreToBackpack.TryStoreItem(Player.m_localPlayer, item, craftBpInventory);
+                            if (fullyStoredCraft)
+                            {
+                                __result = true;
+                                return false;
+                            }
+                        }
+                    }
+
+                    if (StoreToBackpack.ShouldStoreToBackpack(Player.m_localPlayer, item, out Inventory backpackInventory))
+                    {
+                        bool fullyStored = StoreToBackpack.TryStoreItem(Player.m_localPlayer, item, backpackInventory);
+                        if (fullyStored)
                         {
                             __result = true;
                             return false;
                         }
                     }
                 }
-
-                if (StoreToBackpack.ShouldStoreToBackpack(Player.m_localPlayer, item, out Inventory backpackInventory))
+                else if (StoreToBackpack.TryOverflowIntoBackpack(Player.m_localPlayer, item))
                 {
-                    bool fullyStored = StoreToBackpack.TryStoreItem(Player.m_localPlayer, item, backpackInventory);
-                    if (fullyStored)
-                    {
-                        __result = true;
-                        return false;
-                    }
+                    // Chest / Take All / ctrl+click into a full player inventory → backpack.
+                    __result = true;
+                    return false;
                 }
             }
             

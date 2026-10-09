@@ -51,7 +51,8 @@ public static class StoreToBackpack
         if (AdventureBackpacks.PerformYardSale || AdventureBackpacks.QuickDropping || AdventureBackpacks.BypassMoveProtection)
             return false;
 
-        if (InventoryGuiPatches.BackpackIsOpen)
+        // Suppress only when the backpack is the vanilla container slot (not the side panel).
+        if (InventoryGuiPatches.BackpackIsOpen && !SecondaryBackpackPanel.IsOpen)
             return false;
 
         if (!player.IsBackpackEquipped())
@@ -109,6 +110,44 @@ public static class StoreToBackpack
             stack = item.m_stack;
 
         return inventory.SafeFindFreeStackSpace(item.m_shared.m_name, item.m_worldLevel) >= stack;
+    }
+
+    /// <summary>
+    /// When the player inventory cannot hold an item, store it in the equipped backpack
+    /// if overflow is enabled. Skips if the item already lives in the backpack (avoids
+    /// re-adding during backpack → player moves when the player is full).
+    /// </summary>
+    public static bool TryOverflowIntoBackpack(Player player, ItemDrop.ItemData item)
+    {
+        if (PlayerExtensions.IsDedicatedOrHeadless() || !FeatureInitialized)
+            return false;
+
+        if (EnableInventoryOverflowToBackpack == null || !EnableInventoryOverflowToBackpack.Value)
+            return false;
+
+        if (player == null || item?.m_shared == null)
+            return false;
+
+        if (item.IsBackpack() || item.TryGetBackpackItem(out _))
+            return false;
+
+        var playerInventory = player.GetInventory();
+        if (playerInventory == null || CanInventoryAccept(playerInventory, item, item.m_stack))
+            return false;
+
+        if (!player.IsBackpackEquipped())
+            return false;
+
+        var backpack = player.GetEquippedBackpack();
+        var backpackInventory = backpack?.GetInventory();
+        if (backpackInventory?.m_inventory == null)
+            return false;
+
+        // Item is already in the backpack — do not "overflow" it back onto itself.
+        if (backpackInventory.m_inventory.Contains(item))
+            return false;
+
+        return TryStoreItem(player, item, backpackInventory);
     }
 
     public static bool TryStoreItem(Player player, ItemDrop.ItemData item, Inventory backpackInventory)
