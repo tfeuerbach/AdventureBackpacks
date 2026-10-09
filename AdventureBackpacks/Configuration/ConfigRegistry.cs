@@ -57,7 +57,7 @@ namespace AdventureBackpacks.Configuration
                 new ConfigDescription("If enabled, backpack will only open while hovering over equipped backpack and pressing hotkey.  This option overrides Open with Inventory.",
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref OpenWithHoverInteract);
 
-            UnsyncedConfig("Local Config", "Open Alongside Container", false,
+            UnsyncedConfig("Local Config", "Open Alongside Container", true,
                 new ConfigDescription("If enabled, the backpack always opens in a side panel to the right of the player inventory (same window empty or filled). World chests stay open so you can move items between chest and backpack.",
                     null, new ConfigurationManagerAttributes { Order = 3 }), ref OpenAlongsideContainer);
 

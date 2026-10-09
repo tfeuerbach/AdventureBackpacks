@@ -18,7 +18,7 @@
 
 ### Fork addition: Open backpack beside chests
 
-With **Open Alongside Container** enabled (Local Config), the equipped backpack always opens in a **side panel to the right of the player inventory** — the same window whether empty or filled, with or without a world chest open.
+**Open Alongside Container** defaults to **on** in this fork (Local Config). The equipped backpack always opens in a **side panel to the right of the player inventory** — the same window whether empty or filled, with or without a world chest open.
 
 - Keep a chest (or other container) open while using the backpack
 - Drag items between player inventory, chest, and backpack
@@ -112,7 +112,7 @@ Starting as a wee Viking rummaging through the tranquil fields of the Meadows, y
 | **Toggle Backpack** | <kbd>I</kbd> *(Default)* | Opens or closes your equipped backpack inventory. |
 | **Hover Interaction** | *Hover + Hotkey* | Hover over an equipped backpack in your main inventory and press the hotkey to open it directly. |
 | **Open with Inventory** | *Configurable* | Automatically opens your backpack inventory whenever you open your player inventory. |
-| **Open Alongside Container** | *Configurable (fork)* | Opens the backpack in a side panel to the right of inventory; keeps world chests open for dual looting. |
+| **Open Alongside Container** | *On by default (fork)* | Opens the backpack in a side panel to the right of inventory; keeps world chests open for dual looting. |
 | **Outward Quick Drop** | <kbd>Y</kbd> *(Default)* | Press while moving to immediately detach and drop your backpack behind you to escape danger. |
 | **Gamepad / Controller** | 🎮 Native | Full controller navigation support for opening, closing, and managing backpack inventories. |
 
