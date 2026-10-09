@@ -6,9 +6,11 @@
 # 3. Conflicts outside .github/fork-protected-paths.txt → take upstream automatically.
 # 4. Conflicts inside protected paths → open PR + notify; do NOT touch main.
 # 5. Clean / auto-resolved merge → run fork regression tests.
-# 6. Tests pass → auto-merge PR into main.
-# 7. Tests fail → leave PR open; do NOT merge.
+# 6. Tests pass → auto-merge PR into main, then publish fork release <upstreamTag>a
+#    (e.g. upstream v2.2.11 → fork release v2.2.11a).
+# 7. Tests fail → leave PR open; do NOT merge / do NOT release.
 # Notification = failed Actions run (watch the repo) + open PR labeled needs-human.
+# Manual sync PR merges are covered by fork-release-on-sync.yml.
 
 name: Mirror upstream release
 
@@ -213,6 +215,20 @@ jobs:
           gh pr merge "${{ steps.pr.outputs.pr_url }}" --merge --delete-branch \
             --subject "chore: sync upstream ${{ steps.mirror.outputs.latest_tag }}"
           echo "Auto-merged ${{ steps.pr.outputs.pr_url }}"
+
+      - name: Publish fork release (upstream tag + a)
+        if: |
+          steps.mirror.outputs.already_synced != 'true' &&
+          steps.mirror.outputs.needs_human != 'true' &&
+          steps.tests.outputs.passed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          chmod +x .github/scripts/create-fork-release.sh
+          TARGET_COMMIT="$(git rev-parse origin/main)" \
+            .github/scripts/create-fork-release.sh "${{ steps.mirror.outputs.latest_tag }}"
 
       - name: Fail job when human needed or tests failed
         if: |

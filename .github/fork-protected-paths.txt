@@ -13,6 +13,7 @@ AdventureBackpacks/Configuration/ConfigRegistry.cs
 AdventureBackpacks.Tests/
 .github/workflows/fork-tests.yml
 .github/workflows/mirror-upstream.yml
+.github/workflows/fork-release-on-sync.yml
 .github/fork-protected-paths.txt
 .github/upstream-sync-state.json
 .github/scripts/

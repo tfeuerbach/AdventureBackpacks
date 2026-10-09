@@ -1,0 +1,70 @@
+# When a sync PR is merged manually (needs-human path), publish the fork release
+# tag as <upstreamTag>a — same as the automatic mirror path.
+
+name: Fork release on sync merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'sync/upstream-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Derive upstream tag and ensure sync state
+        id: meta
+        run: |
+          set -euo pipefail
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          # sync/upstream-v2.2.11 → v2.2.11
+          TAG="${BRANCH#sync/upstream-}"
+          echo "upstream_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Upstream tag from branch: ${TAG}"
+
+          python - <<PY
+          import json, datetime, pathlib
+          path = pathlib.Path(".github/upstream-sync-state.json")
+          data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+          tag = "${TAG}"
+          if data.get("last_synced_tag") != tag:
+              data["upstream_repo"] = "Vapok/AdventureBackpacks"
+              data["last_synced_tag"] = tag
+              data["last_synced_at"] = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+              data["note"] = "Updated after merged sync PR."
+              path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+              print("state_updated=true")
+          else:
+              print("state_updated=false")
+          PY
+
+          if ! git diff --quiet -- .github/upstream-sync-state.json; then
+            git add .github/upstream-sync-state.json
+            git commit -m "chore: record upstream sync ${TAG}"
+            git push origin main
+          fi
+
+      - name: Publish fork release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x .github/scripts/create-fork-release.sh
+          TARGET_COMMIT="$(git rev-parse HEAD)" \
+            .github/scripts/create-fork-release.sh "${{ steps.meta.outputs.upstream_tag }}"

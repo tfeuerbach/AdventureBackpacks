@@ -45,9 +45,11 @@ GitHub Actions: `.github/workflows/fork-tests.yml`.
 | Result | Behavior |
 | :--- | :--- |
 | No new release | No-op |
-| Clean merge (or only non-protected conflicts) **and tests pass** | Opens PR and **auto-merges** into `main` |
+| Clean merge (or only non-protected conflicts) **and tests pass** | Opens PR, **auto-merges** into `main`, publishes fork release |
 | Conflict in a **protected** fork file | Opens PR labeled `needs-human`, fails the job — **does not** merge |
 | Tests fail after merge | Opens PR labeled `needs-human` / `tests-failed`, fails the job — **does not** merge |
+
+**Fork releases:** each synced upstream tag gets a fork release with a lowercase `a` suffix (upstream `v2.2.11` → fork `v2.2.11a`). That also runs when you manually merge a `sync/upstream-*` PR.
 
 Protected paths: `.github/fork-protected-paths.txt` (side panel, transfer/overflow patches, tests, this README, sync workflows).
 
